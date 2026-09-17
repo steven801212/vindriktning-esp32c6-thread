@@ -1,0 +1,14 @@
+.pio/
+.vscode/
+sdkconfig
+sdkconfig.*
+!sdkconfig.defaults
+managed_components/
+dependencies.lock
+.DS_Store
+Thumbs.db
+.env
+.env.*
+secrets/
+thread_dataset*.txt
+dataset*.hex
