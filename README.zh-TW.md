@@ -15,6 +15,7 @@
 - [x] 單節點 Thread partition：`detached → leader`
 - [x] Phase 1 實機驗證成功
 - [x] Phase 2 Matter-over-Thread 專案骨架
+- [x] PM1006 UART protocol / 5V level-shifting 設計完成
 - [ ] 在 XIAO ESP32-C6 build/flash `v0.2.0-dev1`
 - [ ] iPhone BLE Matter commissioning
 - [ ] 加入現有 HomePod Thread mesh
@@ -48,6 +49,26 @@ Matter sensor endpoints
 先把 Apple Home commissioning 整條鏈跑通，再接真正感測器。
 
 詳細 build 與 Apple Home 測試流程請看 [`matter/README.zh-TW.md`](matter/README.zh-TW.md)。
+
+## VINDRIKTNING PM2.5 整合
+
+PM2.5 採用 **被動監聽 PM1006-like sensor TX** 的方式；保留 IKEA 原本 MCU 的 polling、風扇與 LED 行為。
+
+已確認採用的 frame 規格：
+
+```text
+9600 baud
+20-byte frame
+header = 16 11 0B
+PM2.5 = (byte[5] << 8) | byte[6]
+checksum = sum(byte[0..19]) mod 256 == 0
+```
+
+ESP32-C6 會使用 hardware UART + 非阻塞 20-byte parser，不沿用 ESP8266 的 SoftwareSerial/delay 寫法。
+
+> **硬體注意：**其他 VINDRIKTNING 實測指出 sensor UART 約為 5 V 邏輯；ESP32-C6 GPIO 不應直接接 5 V。第一版預設使用 `10 kΩ + 15 kΩ` 分壓，將 5 V RX 訊號降到約 3.0 V。
+
+完整設計：[`docs/pm1006.zh-TW.md`](docs/pm1006.zh-TW.md)
 
 ## Phase 1 已驗證結果
 
