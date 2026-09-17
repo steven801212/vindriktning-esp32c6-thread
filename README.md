@@ -15,6 +15,7 @@ A staged IKEA VINDRIKTNING retrofit based on the **Seeed Studio XIAO ESP32-C6**.
 - [x] Standalone partition formation: `detached → leader`
 - [x] Phase 1 hardware validation
 - [x] Phase 2 Matter-over-Thread scaffold
+- [x] PM1006 UART protocol / 5 V level-shifting design documented
 - [ ] Build/flash `v0.2.0-dev1` on XIAO ESP32-C6
 - [ ] iPhone BLE Matter commissioning
 - [ ] Join existing HomePod Thread mesh
@@ -48,6 +49,26 @@ The first Matter build deliberately uses fixed values:
 - Air quality: Good
 
 See [`matter/README.md`](matter/README.md) for the Phase 2 build and Apple Home test procedure.
+
+## VINDRIKTNING PM2.5 integration
+
+PM2.5 will be acquired by **passively listening to the PM1006-like sensor TX line**, leaving the IKEA MCU's original polling, fan and LED behavior intact.
+
+Protocol currently targeted:
+
+```text
+9600 baud
+20-byte frame
+header = 16 11 0B
+PM2.5 = (byte[5] << 8) | byte[6]
+checksum = sum(byte[0..19]) mod 256 == 0
+```
+
+The ESP32-C6 implementation will use a hardware UART and a non-blocking 20-byte parser rather than the older ESP8266 SoftwareSerial/delay pattern.
+
+> **Electrical warning:** published VINDRIKTNING measurements report approximately 5 V UART logic. The ESP32-C6 GPIO should not be connected directly to a 5 V TX signal. The initial design uses a `10 kΩ + 15 kΩ` divider to reduce a 5 V RX signal to about 3.0 V.
+
+Full design notes: [`docs/pm1006.md`](docs/pm1006.md)
 
 ## Phase 1 verified result
 
