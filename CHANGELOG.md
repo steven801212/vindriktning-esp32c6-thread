@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.2.0-dev1
+
+- Add first Matter-over-Thread development scaffold on `phase2-matter-thread`.
+- Target ESP-Matter `release/v1.4.2` with ESP-IDF `v5.4.1` and ESP32-C6.
+- Add BLE Matter commissioning path for joining an existing Thread mesh without manually committing household Thread credentials.
+- Add fixed development values for Air Quality, PM2.5, temperature, and humidity.
+- Document VINDRIKTNING PM1006 UART behavior: 9600 baud, 20-byte frames, `16 11 0B` header, PM2.5 in bytes 5/6, and 8-bit checksum sum equal to zero.
+- Define the PM1006 integration as passive RX-only monitoring using ESP32-C6 hardware UART and a non-blocking parser.
+- Add electrical safety requirement for the reported ~5 V VINDRIKTNING UART signal; initial RX design uses a 10 kΩ / 15 kΩ divider to approximately 3.0 V.
+- Keep stock IKEA fan/LED/polling behavior unchanged for the first hardware version.
+
 ## 0.1.7-phase1-heartbeat
 
 - Validated on real XIAO ESP32-C6 hardware: `detached -> leader` at ~35 s.
