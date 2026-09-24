@@ -6,7 +6,7 @@
 
 > 穩定基線：`0.1.7-phase1-heartbeat`（`main`）
 >
-> 目前開發版：`0.2.0-dev1`（`phase2-matter-thread`）
+> 目前開發版：`0.2.0-dev2`（`phase2-matter-thread`）
 
 ## 目前進度
 
@@ -16,11 +16,13 @@
 - [x] Phase 1 實機驗證成功
 - [x] Phase 2 Matter-over-Thread 專案骨架
 - [x] PM1006 UART protocol / 5V level-shifting 設計完成
-- [ ] 在 XIAO ESP32-C6 build/flash `v0.2.0-dev1`
-- [ ] iPhone BLE Matter commissioning
-- [ ] 加入現有 HomePod Thread mesh
-- [ ] Apple Home 顯示／讀取 sensor
-- [ ] 把固定假資料換成 VINDRIKTNING PM2.5 + SHTC3
+- [x] XIAO ESP32-C6 已實機 build/flash `v0.2.0-dev1`
+- [x] iPhone BLE Matter commissioning
+- [x] 加入現有 HomePod Thread mesh
+- [x] Apple Home 感測值顯示正常（使用者確認）
+- [x] `dev2` 加入唯讀 AHT20 + BMP280 I²C 診斷（待本機編譯／實測）
+- [ ] 序列埠確認真實感測數據
+- [ ] 把固定 Matter 資料換成 VINDRIKTNING PM2.5 + AHT20 + BMP280
 
 ## Phase 2 正式架構
 
@@ -39,14 +41,14 @@ Matter sensor endpoints
 
 因此正式 onboarding **不需要手動把家中的 Active Operational Dataset 寫進 firmware**。手動 dataset provisioning 只保留作工程診斷／救援用途，而且家庭 Thread credentials 永遠不能 commit 到 GitHub。
 
-第一個 Matter 版本先固定輸出：
+`dev2` Matter 端點仍固定輸出測試數值；新感測器讀值目前只進序列埠，不會自動出現在 Apple Home 或 HA：
 
 - 溫度：25.00 °C
 - 相對濕度：50.00 %
 - PM2.5：10 µg/m³
 - Air Quality：Good
 
-先把 Apple Home commissioning 整條鏈跑通，再接真正感測器。
+Apple Home commissioning 已完成；目前等待感測器實機診斷與後續 Matter 真實資料更新。
 
 詳細 build 與 Apple Home 測試流程請看 [`matter/README.zh-TW.md`](matter/README.zh-TW.md)。
 

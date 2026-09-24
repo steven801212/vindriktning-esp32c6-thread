@@ -6,7 +6,7 @@ A staged IKEA VINDRIKTNING retrofit based on the **Seeed Studio XIAO ESP32-C6**.
 
 > Stable baseline: `0.1.7-phase1-heartbeat` on `main`
 >
-> Current development: `0.2.0-dev1` on `phase2-matter-thread`
+> Current development: `0.2.0-dev2` on `phase2-matter-thread`
 
 ## Status
 
@@ -16,11 +16,13 @@ A staged IKEA VINDRIKTNING retrofit based on the **Seeed Studio XIAO ESP32-C6**.
 - [x] Phase 1 hardware validation
 - [x] Phase 2 Matter-over-Thread scaffold
 - [x] PM1006 UART protocol / 5 V level-shifting design documented
-- [ ] Build/flash `v0.2.0-dev1` on XIAO ESP32-C6
-- [ ] iPhone BLE Matter commissioning
-- [ ] Join existing HomePod Thread mesh
-- [ ] Apple Home sensor visibility
-- [ ] Replace fixed values with VINDRIKTNING PM2.5 + SHTC3
+- [x] Build/flash `v0.2.0-dev1` on XIAO ESP32-C6
+- [x] iPhone BLE Matter commissioning
+- [x] Join existing HomePod Thread mesh
+- [x] Apple Home sensor visibility confirmed by user
+- [x] Add read-only AHT20 + BMP280 I²C diagnostics to `dev2` (pending local build/flash validation)
+- [ ] Confirm real sensor readings in serial monitor
+- [ ] Replace fixed Matter values with VINDRIKTNING PM2.5 + AHT20 + BMP280
 
 ## Phase 2 architecture
 
@@ -41,14 +43,14 @@ Matter sensor endpoints
 
 Manual Thread Active Operational Dataset injection is retained only as a diagnostics/recovery path. Household Thread credentials must never be committed to this repository.
 
-The first Matter build deliberately uses fixed values:
+The Matter device still exposes fixed demo values in `dev2`; real AHT20/BMP280 readings are logged only and are not sent to Matter:
 
 - Temperature: 25.00 °C
 - Relative humidity: 50.00 %
 - PM2.5: 10 µg/m³
 - Air quality: Good
 
-See [`matter/README.md`](matter/README.md) for the Phase 2 build and Apple Home test procedure.
+See [`matter/README.md`](matter/README.md) for safe build/flash steps and the new I²C diagnostic test.
 
 ## VINDRIKTNING PM2.5 integration
 
