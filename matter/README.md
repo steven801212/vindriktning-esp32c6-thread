@@ -41,11 +41,13 @@ git pull --ff-only
 source ~/esp/esp-idf/export.sh
 source ~/esp/esp-matter/export.sh
 cd matter
-idf.py build
-idf.py -p /dev/ttyACM0 flash monitor
+idf.py -B build-dev3 -D SDKCONFIG=sdkconfig.dev3 build
+grep '^CONFIG_ESP_MATTER_MAX_DYNAMIC_ENDPOINT_COUNT=' sdkconfig.dev3
+# Expect 5. Confirm the serial boot log says the current app is from OTA 0.
+idf.py -B build-dev3 -D SDKCONFIG=sdkconfig.dev3 -p /dev/ttyACM0 app-flash monitor
 ```
 
-If `git status --short` reports local edits, preserve them and resolve before pulling. Exit a running serial monitor with `Ctrl+]` before flashing. **Do not use `erase-flash`, `fullclean` is not required, and do not change `partitions.csv` or use `set-target` for this update.** Ordinary `flash` should preserve existing NVS and Matter fabric data, provided the partition table is unchanged. Verify Apple Home and HA remain reachable afterward.
+If `git status --short` reports local edits, preserve them and resolve before pulling. Exit a running serial monitor with `Ctrl+]` before flashing. The separate `sdkconfig.dev3` matters: an existing dev2 `sdkconfig` can retain the old endpoint limit of 4, even though `sdkconfig.defaults` now says 5. **Check that the current device boots from OTA 0 before using the app-only command above.** The prior dev2 log showed OTA 0, but check again in the current serial boot log. `app-flash` writes only the application at `0x20000`; it leaves bootloader, partition table, OTA selection, and NVS untouched. Do not use `erase-flash` or `set-target`. If the device currently boots from OTA 1, stop and choose the correct update path rather than blindly flashing OTA 0. Verify Apple Home and HA after reboot.
 
 Expected diagnostic format, **illustrative rather than measured**:
 

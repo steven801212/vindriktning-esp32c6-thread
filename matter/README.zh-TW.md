@@ -41,11 +41,13 @@ git pull --ff-only
 source ~/esp/esp-idf/export.sh
 source ~/esp/esp-matter/export.sh
 cd matter
-idf.py build
-idf.py -p /dev/ttyACM0 flash monitor
+idf.py -B build-dev3 -D SDKCONFIG=sdkconfig.dev3 build
+grep '^CONFIG_ESP_MATTER_MAX_DYNAMIC_ENDPOINT_COUNT=' sdkconfig.dev3
+# 預期是 5；先從序列埠開機紀錄確認目前從 OTA 0 啟動。
+idf.py -B build-dev3 -D SDKCONFIG=sdkconfig.dev3 -p /dev/ttyACM0 app-flash monitor
 ```
 
-若 `git status --short` 有本地修改，請先保留並處理，勿直接覆蓋。刷寫前先以 `Ctrl+]` 離開既有 monitor。**不要執行 `erase-flash`、不要變更 `partitions.csv` 或重新 `set-target`。** 一般 `flash` 在分割表不變時應保留原有 NVS／Matter 配對資料。刷寫後也確認 Apple Home／HA 連線正常。
+若 `git status --short` 有本地修改，請先保留並處理，勿直接覆蓋。刷寫前先以 `Ctrl+]` 離開既有 monitor。獨立的 `sdkconfig.dev3` 很重要：既有 dev2 `sdkconfig` 仍可能保留舊端點上限 4，不會因為 defaults 已改為 5 而自動更新。**執行上述 app-only 刷寫前，先從目前序列埠開機紀錄確認裝置由 OTA 0 啟動。**先前 dev2 log 是 OTA 0，但仍需現在再確認。`app-flash` 只寫入 `0x20000` 的應用程式，不改 bootloader、分割表、OTA 選擇及 NVS。不要執行 `erase-flash` 或 `set-target`。若目前從 OTA 1 啟動，先停止並選正確更新方式，不要盲刷 OTA 0。重啟後再確認 Apple Home／HA。
 
 預期格式（**以下數值是範例，不是你的實測**）：
 
