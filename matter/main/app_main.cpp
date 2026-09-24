@@ -2,6 +2,7 @@
 #include <esp_log.h>
 #include <esp_matter.h>
 #include <nvs_flash.h>
+#include "sensor_diag.h"
 
 #include <app_openthread_config.h>
 #include <common_macros.h>
@@ -54,7 +55,7 @@ static void app_event_cb(const ChipDeviceEvent *event, intptr_t arg)
 
 extern "C" void app_main(void)
 {
-    ESP_LOGI(TAG, "VINDRIKTNING Matter-over-Thread v0.2.0-dev1");
+    ESP_LOGI(TAG, "VINDRIKTNING Matter-over-Thread v0.2.0-dev2");
     ESP_LOGI(TAG, "Fake sensor data: 25.00 C / 50.00 %%RH / PM2.5 10 ug/m3 / Air Quality Good");
 
     esp_err_t err = nvs_flash_init();
@@ -116,4 +117,5 @@ extern "C" void app_main(void)
 
     ESP_LOGI(TAG, "Matter started. Device is ready for BLE commissioning into a Thread network.");
     ESP_LOGI(TAG, "Development setup passcode is normally 20202021 / discriminator 3840 unless factory data overrides it.");
+    start_sensor_diagnostics();
 }

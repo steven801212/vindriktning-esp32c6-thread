@@ -4,7 +4,7 @@ if(NOT DEFINED ENV{ESP_MATTER_PATH})
     message(FATAL_ERROR "Please set ESP_MATTER_PATH to the esp-matter repository")
 endif()
 
-set(PROJECT_VER "0.2.0-dev1")
+set(PROJECT_VER "0.2.0-dev2")
 set(PROJECT_VER_NUMBER 2)
 
 set(ESP_MATTER_PATH $ENV{ESP_MATTER_PATH})

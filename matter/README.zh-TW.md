@@ -1,95 +1,66 @@
-# Phase 2 — Matter over Thread（v0.2.0-dev1）
+# Phase 2 — Matter over Thread（v0.2.0-dev2）
 
 [English](README.md)
 
-這個子專案把正式加入家庭 Thread 網路的方式，從「手動灌 Active Operational Dataset」改成標準的 **Matter over Thread commissioning**。
+## 目前狀態
 
-## 這版提供的測試裝置
+- `dev1` 已在 XIAO ESP32-C6 實機燒錄並成功加入 Apple Home；後續序列埠 log 顯示兩個 Matter Fabric。這不等同新感測器已通過驗證。
+- `dev2` 新增**唯讀 I²C 感測器診斷任務**；尚需使用者在 WSL 編譯、燒錄及實測數值。
+- Matter 端點和固定測試數值**不變**：25°C、50%RH、PM2.5 10 µg/m³、Air Quality Good。
+- 尚未新增氣壓 Matter 端點；BMP280 氣壓只輸出到序列埠，Apple Home／HA 此階段不會看到真實氣壓或真實溫濕度。
 
-目前全部使用固定假資料：
+## 接線：XIAO ESP32-C6
 
-- Matter Air Quality Sensor，Device Type `0x002C`
-- Air Quality = Good
-- PM2.5 = 10 µg/m³
-- Temperature = 25.00 °C
-- Relative Humidity = 50.00 %
+| AHT20 + BMP280 模組 | XIAO |
+| --- | --- |
+| VDD | 3V3（不要接 5V） |
+| GND | GND |
+| SDA | D4 / GPIO22 |
+| SCL | D5 / GPIO23 |
 
-`dev1` 的目的不是測真正的 VINDRIKTNING 感測器，而是先確認整條鏈：
+兩顆感測器共用 I²C；預期掃描到 AHT20 `0x38`、BMP280 `0x76` 或 `0x77`。程式會檢查 BMP280 晶片識別 `0x58`（BME280 的 `0x60` 不會冒充通過），驗證 AHT20 CRC，並使用 BMP280 原廠校正係數計算氣壓。氣壓是**所在地絕對氣壓**，不是海平面校正氣壓。若開機時未偵測到感測器，修好接線後請重啟。
 
-```text
-iPhone → BLE Matter commissioning → Thread credentials
-       → HomePod mini Thread mesh → Apple Home Matter fabric
-       → sensor endpoints
-```
+## 安全更新與測試
 
-成功之後才把假資料替換成 VINDRIKTNING PM2.5 + SHTC3。
-
-## 開發環境
-
-Phase 2 不直接沿用 Phase 1 的 PlatformIO + ESP-IDF 5.5。
-
-本 branch 固定：
-
-- ESP-Matter：`release/v1.4.2`
-- ESP-IDF：`v5.4.1`
-- Target：`esp32c6`
-- Matter transport：Thread
-- Commissioning：BLE
-- Wi-Fi：關閉
-- OpenThread CLI：關閉
-
-ESP-Matter 1.4.2 官方就是以 ESP-IDF 5.4.1 為建議版本，因此先使用這個組合降低版本相容性問題。
-
-## Build / Flash
-
-準備好 ESP-IDF v5.4.1 與 ESP-Matter `release/v1.4.2` 的環境後，進入本 repo 的 `matter` 目錄：
+在另一個 **Windows PowerShell** 中掛載 USB，先用 `usbipd list` 查實際 BUSID：
 
 ```powershell
-idf.py -D "SDKCONFIG_DEFAULTS=sdkconfig.defaults;sdkconfig.defaults.esp32c6" set-target esp32c6
+usbipd list
+usbipd attach --wsl --busid 1-2
+```
+
+然後在 **Ubuntu WSL** 執行：
+
+```bash
+cd ~/vindriktning-esp32c6-thread
+git status --short
+git switch phase2-matter-thread
+git pull --ff-only
+source ~/esp/esp-idf/export.sh
+source ~/esp/esp-matter/export.sh
+cd matter
 idf.py build
-idf.py -p COM4 flash monitor
+idf.py -p /dev/ttyACM0 flash monitor
 ```
 
-第一次測 Matter 建議把 Phase 1 與舊實驗留下的 NVS 清掉一次：
+若 `git status --short` 有本地修改，請先保留並處理，勿直接覆蓋。刷寫前先以 `Ctrl+]` 離開既有 monitor。**不要執行 `erase-flash`、不要變更 `partitions.csv` 或重新 `set-target`。** 一般 `flash` 在分割表不變時應保留原有 NVS／Matter 配對資料。刷寫後也確認 Apple Home／HA 連線正常。
 
-```powershell
-idf.py -p COM4 erase-flash
-```
-
-再重新 flash。
-
-## Apple Home 測試流程
-
-1. HomePod mini 保持在線，作為 Thread Border Router。
-2. 將 `v0.2.0-dev1` 燒進 XIAO ESP32-C6。
-3. iPhone 打開「家庭」→ 加入配件。
-4. 使用 ESP-Matter development commissioning payload / QR code 加入。
-5. 若未被 factory data 覆寫，ESP-Matter 常用 development setup passcode 為 `20202021`、discriminator `3840`。
-6. Apple Home 會透過 Matter commissioning 把 Thread credentials 傳給 ESP32-C6；不需要把家裡的 Thread Network Key 寫進 source code。
-7. Serial 若出現：
+預期格式（**以下數值是範例，不是你的實測**）：
 
 ```text
-Matter commissioning COMPLETE
+I (...) SENSOR_DIAG: I2C ACK: 0x38
+I (...) SENSOR_DIAG: I2C ACK: 0x76
+I (...) SENSOR_DIAG: I2C scan complete: AHT20=ACK BMP280=ACK
+I (...) SENSOR_DIAG: AHT20: 26.42 C / 58.20 %RH
+I (...) SENSOR_DIAG: BMP280: 1008.63 hPa (absolute station pressure)
 ```
 
-代表 Matter fabric commissioning 已完成。
+若找不到裝置，先確認 3V3、GND、接頭腳位順序、SDA/SCL 與上拉電阻。請回傳含錯誤的第一段 `SENSOR_DIAG` log，再接下一階段的 Matter 真實數值更新。
 
-## 成功標準
+## 工具鏈
 
-- iPhone 能透過 BLE 發現裝置。
-- Matter commissioning 能自動配置 Thread network。
-- ESP32-C6 加入 HomePod 所在的 Thread mesh。
-- Apple Home 完成 Matter commissioning。
-- 能讀到固定的 25°C、50% RH、Air Quality Good；PM2.5 cluster 可被 Matter controller 讀取。
-- 全程不需要手動複製 Active Operational Dataset。
+ESP-Matter `release/v1.4.2`、ESP-IDF `v5.4.1`、`esp32c6`、原生 Matter over Thread／BLE commissioning、關閉 Wi-Fi。Phase 1 的 PlatformIO／IDF 5.5 不直接沿用。
 
-> Apple Home 的 UI 不保證一定把所有 optional concentration cluster 的數字都直接顯示出來。因此 PM2.5 若 UI 沒出現，之後會再用 Home Assistant / chip-tool 驗證 Matter cluster 本身。
+## 資安
 
-## Security
-
-不要把以下內容 commit 到 GitHub：
-
-- 家庭 Thread Active Operational Dataset
-- Thread Network Key / PSKc
-- DAC private key
-- production factory-data image
+勿提交家庭 Thread dataset／金鑰、PSKc、DAC private key 或 production factory-data image。
