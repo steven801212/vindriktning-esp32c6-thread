@@ -6,7 +6,7 @@
 
 > 穩定基線：`0.1.7-phase1-heartbeat`（`main`）
 >
-> 目前開發版：`0.2.0-dev2`（`phase2-matter-thread`）
+> 目前開發版：`0.2.0-dev3`（`phase2-matter-thread`）
 
 ## 目前進度
 
@@ -20,9 +20,11 @@
 - [x] iPhone BLE Matter commissioning
 - [x] 加入現有 HomePod Thread mesh
 - [x] Apple Home 感測值顯示正常（使用者確認）
-- [x] `dev2` 加入唯讀 AHT20 + BMP280 I²C 診斷（待本機編譯／實測）
-- [ ] 序列埠確認真實感測數據
-- [ ] 把固定 Matter 資料換成 VINDRIKTNING PM2.5 + AHT20 + BMP280
+- [x] 實機確認 AHT20 與 BMP280 真實讀值
+- [x] 編譯並僅燒錄 `dev3` 應用程式，保留 NVS 與 Apple Home fabric
+- [x] 將真實溫濕度更新至 Matter endpoint 2/3，絕對氣壓更新至 endpoint 4；序列日誌確認控制端恢復訂閱並回覆成功
+- [ ] 完成 Home Assistant Multi-Admin 配對並確認實體顯示
+- [ ] PM1006 接線後才替換 PM2.5 測試值
 
 ## Phase 2 正式架構
 
@@ -41,14 +43,12 @@ Matter sensor endpoints
 
 因此正式 onboarding **不需要手動把家中的 Active Operational Dataset 寫進 firmware**。手動 dataset provisioning 只保留作工程診斷／救援用途，而且家庭 Thread credentials 永遠不能 commit 到 GitHub。
 
-`dev2` Matter 端點仍固定輸出測試數值；新感測器讀值目前只進序列埠，不會自動出現在 Apple Home 或 HA：
+實機 `dev3` 已把 AHT20 溫濕度寫入 Matter endpoint 2/3，BMP280 的絕對測站氣壓寫入標準 Pressure Measurement cluster（endpoint 4）。序列日誌證實屬性更新與控制端訂閱回覆成功；Apple Home 顯示與 HA 配對仍需現場確認。**不保證 Apple Home 會顯示氣壓。** 以下數值仍是開發期假值，待 PM1006 接線後才能替換：
 
-- 溫度：25.00 °C
-- 相對濕度：50.00 %
 - PM2.5：10 µg/m³
 - Air Quality：Good
 
-Apple Home commissioning 已完成；目前等待感測器實機診斷與後續 Matter 真實資料更新。
+Apple Home 初次 commissioning 已完成；Home Assistant 分享配對仍待排查 Thread IPv6 可達性。
 
 詳細 build 與 Apple Home 測試流程請看 [`matter/README.zh-TW.md`](matter/README.zh-TW.md)。
 
@@ -113,6 +113,7 @@ repo 根目錄的 PlatformIO 專案仍保留為 Phase 1 穩定硬體驗證基線
 - PM2.5 Concentration Measurement cluster
 - Temperature Measurement
 - Relative Humidity Measurement
+- Pressure Measurement（絕對測站氣壓；HA 顯示仍取決於整合支援）
 
 ## Security
 

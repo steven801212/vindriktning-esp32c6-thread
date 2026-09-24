@@ -6,7 +6,7 @@ A staged IKEA VINDRIKTNING retrofit based on the **Seeed Studio XIAO ESP32-C6**.
 
 > Stable baseline: `0.1.7-phase1-heartbeat` on `main`
 >
-> Current development: `0.2.0-dev2` on `phase2-matter-thread`
+> Current development: `0.2.0-dev3` on `phase2-matter-thread`
 
 ## Status
 
@@ -20,9 +20,11 @@ A staged IKEA VINDRIKTNING retrofit based on the **Seeed Studio XIAO ESP32-C6**.
 - [x] iPhone BLE Matter commissioning
 - [x] Join existing HomePod Thread mesh
 - [x] Apple Home sensor visibility confirmed by user
-- [x] Add read-only AHT20 + BMP280 I²C diagnostics to `dev2` (pending local build/flash validation)
-- [ ] Confirm real sensor readings in serial monitor
-- [ ] Replace fixed Matter values with VINDRIKTNING PM2.5 + AHT20 + BMP280
+- [x] Confirm live AHT20 and BMP280 readings on the wired XIAO ESP32-C6
+- [x] Build and app-flash `dev3` without erasing NVS or the Apple Home fabric
+- [x] Update Matter temperature/humidity endpoints 2/3 and pressure endpoint 4 from live sensors; serial log confirms a resumed controller subscription
+- [ ] Complete Home Assistant Multi-Admin commissioning and verify its entities
+- [ ] Replace the PM2.5 development value after PM1006 receive-only wiring
 
 ## Phase 2 architecture
 
@@ -43,14 +45,12 @@ Matter sensor endpoints
 
 Manual Thread Active Operational Dataset injection is retained only as a diagnostics/recovery path. Household Thread credentials must never be committed to this repository.
 
-The Matter device still exposes fixed demo values in `dev2`; real AHT20/BMP280 readings are logged only and are not sent to Matter:
+On the tested `dev3` hardware, AHT20 temperature and humidity update Matter endpoints 2/3; BMP280 absolute station pressure updates the standard Pressure Measurement cluster on endpoint 4. The serial log verifies attribute writes and a controller's successful subscription response, but Apple Home display and Home Assistant pairing still need field confirmation. Pressure display in Apple Home is not claimed. The following values remain development placeholders until PM1006 is connected:
 
-- Temperature: 25.00 °C
-- Relative humidity: 50.00 %
 - PM2.5: 10 µg/m³
 - Air quality: Good
 
-See [`matter/README.md`](matter/README.md) for safe build/flash steps and the new I²C diagnostic test.
+See [`matter/README.md`](matter/README.md) for safe build/flash steps, sensor failure behavior, and the Apple Home → Home Assistant sharing procedure.
 
 ## VINDRIKTNING PM2.5 integration
 
@@ -106,13 +106,14 @@ The Phase 1 PlatformIO project remains in the repository root as a stable hardwa
 - Wi-Fi disabled
 - OpenThread CLI disabled
 
-## Planned Matter model
+## Matter model
 
 - Air Quality Sensor device type `0x002C`
 - Air Quality cluster
 - PM2.5 Concentration Measurement cluster
 - Temperature Measurement
 - Relative Humidity Measurement
+- Pressure Measurement (absolute station pressure; Home Assistant display depends on integration support)
 
 ## Security
 

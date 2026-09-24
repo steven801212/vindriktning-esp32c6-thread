@@ -74,8 +74,8 @@ ESP-Matter `release/v1.4.2`、ESP-IDF `v5.4.1`、`esp32c6`、原生 Matter over 
 1. iPhone 與 HomePod mini 都先更新、確認在同一個 Apple Home，iPhone 使用的是此家庭的**擁有者**帳號。Apple 列出的 Home 對 Matter 感測器支援包含溫度與濕度，沒有列氣壓；即使本韌體有標準 Pressure Measurement cluster，也不可宣稱 Apple Home 會顯示氣壓。
 2. 在 Apple Home 開啟這個配件的設定，使用 Matter 分享／`Turn On Pairing Mode` 產生暫時配對碼。這是由已配對 fabric 要求開啟 enhanced commissioning window，不是未配對時的 BLE 廣播。若沒有這個選項，先更新 iOS/HomePod 並確認擁有者權限，先不要改韌體或清 NVS。
 3. 在 **Home Assistant Companion 手機 App**（不是瀏覽器）依序選 **設定 → Connectivity → Matter → Add device**，選 **Yes, it’s already in use**，再選 Apple Home，並依畫面交接暫時碼；交接時保持手機 App 開啟。
-4. PVE 上的 HAOS NIC 必須 bridge 到和 HomePod/iPhone 相同的 L2 LAN，不能是一般 NAT。PVE bridge/防火牆要允許 IPv6 ICMP/ND、mDNS UDP 5353 multicast 與 Matter UDP 5540，不能過濾 IPv6 multicast。確認 HAOS 有 global 或 ULA IPv6 位址及 default route；DNS-SD 同時需要 multicast 與 IPv6 路由。
-5. 只做一次配對測試時，收集但不要貼出 Thread 金鑰：`ha addons logs core_matter_server`、`ha core logs`，以及 ESP 從 `Matter commissioning session started` 到成功/失敗的 serial log。成功必須看到 commissioning-window 事件與可建立 CASE；`SRP update timed out`、反覆 CASE Sigma1 重傳、`unknown session` 代表可達性/DNS-SD 問題，和 AHT20 無關。
+4. PVE 上的 HAOS NIC 必須 bridge 到 HomePod 所在的 IoT VLAN，不能是一般 NAT；iPhone 可在另一個可路由的 LAN，但裝置探索與控制器交接必須正常。PVE bridge/防火牆要允許 IPv6 ICMP/ND、mDNS UDP 5353 multicast 與 Matter UDP 5540。除了 IPv6 位址，更要確認 HAOS **對 Matter Server 發現的 Thread 裝置 IPv6 位址有可用路由**（在 HAOS shell 執行 `ip -6 route get <裝置 IPv6>`）。另一張網卡有 IPv6 預設路由，不等於 Thread 前綴可達；尚未確認路由前不要猜測 gateway 或關閉隔離。
+5. 只做一次配對測試時，收集但不要貼出 Thread 金鑰：`ha addons logs core_matter_server`、`ha core logs`，以及 ESP 從 `Matter commissioning session started` 到成功/失敗的 serial log。成功必須看到 commissioning-window 事件與可建立 CASE；`SRP update timed out`、反覆 CASE Sigma1 重傳、`unknown session` 值得檢查路由與探索，但單靠這些訊息無法確定哪段網路故障，更不能指向 AHT20。
 
 如果 HA Matter Server 對該標準 endpoint 有對應，HA 有可能出現氣壓實體；這需要以實際 HA 裝置頁為準，不是保證。Apple Home 氣壓顯示則明確不保證。
 
