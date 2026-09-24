@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.0-dev3
+
+- Publish CRC-checked AHT20 temperature and relative humidity to the existing Matter endpoints 2 and 3 using `attribute::update()` on the CHIP system layer. This produces normal reports for active Matter subscriptions.
+- Start temperature/humidity as nullable rather than presenting the old 25 °C / 50 %RH demo readings before the first valid sample.
+- Mark AHT20 values unknown after three consecutive failed reads (15 seconds at the current cadence), and publish a recovery sample when reads resume.
+- Add a standard Matter Pressure Sensor endpoint after the existing endpoints. BMP280 absolute station pressure is rounded to whole hPa; it also becomes unknown after three consecutive read failures.
+- Preserve the development PM2.5 10 µg/m3 and Air Quality Good values until the PM1006 receive-only wiring is added. The partition table and NVS handling are unchanged.
+
 ## 0.2.0-dev1
 
 - Add first Matter-over-Thread development scaffold on `phase2-matter-thread`.

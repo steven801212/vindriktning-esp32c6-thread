@@ -1,13 +1,15 @@
-# Phase 2 — Matter over Thread（v0.2.0-dev2）
+# Phase 2 — Matter over Thread（v0.2.0-dev3）
 
 [English](README.md)
 
 ## 目前狀態
 
 - `dev1` 已在 XIAO ESP32-C6 實機燒錄並成功加入 Apple Home；後續序列埠 log 顯示兩個 Matter Fabric。這不等同新感測器已通過驗證。
-- `dev2` 新增**唯讀 I²C 感測器診斷任務**；尚需使用者在 WSL 編譯、燒錄及實測數值。
-- Matter 端點和固定測試數值**不變**：25°C、50%RH、PM2.5 10 µg/m³、Air Quality Good。
-- 尚未新增氣壓 Matter 端點；BMP280 氣壓只輸出到序列埠，Apple Home／HA 此階段不會看到真實氣壓或真實溫濕度。
+- `dev3` 把已驗證的 AHT20 讀值送至既有 Matter 端點 2（溫度）和 3（濕度）。更新會排程到 CHIP system layer，既有 Matter 訂閱會收到標準屬性報告。
+- 溫濕度在第一次通過 CRC 的 AHT20 讀值前是**未知值**；連續三次讀取失敗（目前週期為 5 秒，即 15 秒）後也會重新報告未知，避免控制器持續顯示舊數值。讀取恢復後會重新更新。
+- 新增一個排在既有空品、溫度與濕度端點之後的標準 Matter Pressure Sensor 端點。BMP280 以整數 hPa 回報**所在地絕對氣壓**，不做海平面校正，且同樣採三次失敗後標示未知的策略。
+- PM2.5 仍維持開發用 10 µg/m³、Air Quality 仍為 Good，直到接上 PM1006 的被動 RX。既有端點 1/2/3 不會換號。
+- 此次修改尚未操作實機、Apple Home、HA 或 Thread；仍須編譯與現場驗證，不宣稱已完成配對。
 
 ## 接線：XIAO ESP32-C6
 
@@ -53,6 +55,8 @@ I (...) SENSOR_DIAG: I2C ACK: 0x76
 I (...) SENSOR_DIAG: I2C scan complete: AHT20=ACK BMP280=ACK
 I (...) SENSOR_DIAG: AHT20: 26.42 C / 58.20 %RH
 I (...) SENSOR_DIAG: BMP280: 1008.63 hPa (absolute station pressure)
+I (...) SENSOR_DIAG: Matter AHT20 report: updated
+I (...) SENSOR_DIAG: Matter BMP280 report: updated
 ```
 
 若找不到裝置，先確認 3V3、GND、接頭腳位順序、SDA/SCL 與上拉電阻。請回傳含錯誤的第一段 `SENSOR_DIAG` log，再接下一階段的 Matter 真實數值更新。
@@ -60,6 +64,18 @@ I (...) SENSOR_DIAG: BMP280: 1008.63 hPa (absolute station pressure)
 ## 工具鏈
 
 ESP-Matter `release/v1.4.2`、ESP-IDF `v5.4.1`、`esp32c6`、原生 Matter over Thread／BLE commissioning、關閉 Wi-Fi。Phase 1 的 PlatformIO／IDF 5.5 不直接沿用。
+
+## Apple Home 分享到 Home Assistant（Multi-Admin）排查
+
+序列埠裡的兩個 Fabric 只表示曾有兩個 fabric 被保存；**不**代表 HA 已經能存取裝置、commissioning window 已開啟，或 Thread Border Router 的路由正常。測試此流程不要 erase。
+
+1. iPhone 與 HomePod mini 都先更新、確認在同一個 Apple Home，iPhone 使用的是此家庭的**擁有者**帳號。Apple 列出的 Home 對 Matter 感測器支援包含溫度與濕度，沒有列氣壓；即使本韌體有標準 Pressure Measurement cluster，也不可宣稱 Apple Home 會顯示氣壓。
+2. 在 Apple Home 開啟這個配件的設定，使用 Matter 分享／`Turn On Pairing Mode` 產生暫時配對碼。這是由已配對 fabric 要求開啟 enhanced commissioning window，不是未配對時的 BLE 廣播。若沒有這個選項，先更新 iOS/HomePod 並確認擁有者權限，先不要改韌體或清 NVS。
+3. 在 **Home Assistant Companion 手機 App**（不是瀏覽器）依序選 **設定 → Connectivity → Matter → Add device**，選 **Yes, it’s already in use**，再選 Apple Home，並依畫面交接暫時碼；交接時保持手機 App 開啟。
+4. PVE 上的 HAOS NIC 必須 bridge 到和 HomePod/iPhone 相同的 L2 LAN，不能是一般 NAT。PVE bridge/防火牆要允許 IPv6 ICMP/ND、mDNS UDP 5353 multicast 與 Matter UDP 5540，不能過濾 IPv6 multicast。確認 HAOS 有 global 或 ULA IPv6 位址及 default route；DNS-SD 同時需要 multicast 與 IPv6 路由。
+5. 只做一次配對測試時，收集但不要貼出 Thread 金鑰：`ha addons logs core_matter_server`、`ha core logs`，以及 ESP 從 `Matter commissioning session started` 到成功/失敗的 serial log。成功必須看到 commissioning-window 事件與可建立 CASE；`SRP update timed out`、反覆 CASE Sigma1 重傳、`unknown session` 代表可達性/DNS-SD 問題，和 AHT20 無關。
+
+如果 HA Matter Server 對該標準 endpoint 有對應，HA 有可能出現氣壓實體；這需要以實際 HA 裝置頁為準，不是保證。Apple Home 氣壓顯示則明確不保證。
 
 ## 資安
 

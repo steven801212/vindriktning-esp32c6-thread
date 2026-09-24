@@ -7,8 +7,10 @@
 #include <driver/i2c_master.h>
 #include <esp_err.h>
 #include <esp_log.h>
+#include <esp_matter.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
+#include <platform/CHIPDeviceLayer.h>
 
 namespace {
 constexpr char TAG[] = "SENSOR_DIAG";
@@ -19,10 +21,12 @@ constexpr uint8_t BMP280_ADDR_A = 0x76;
 constexpr uint8_t BMP280_ADDR_B = 0x77;
 constexpr int TIMEOUT_MS = 100;
 constexpr TickType_t PERIOD = pdMS_TO_TICKS(5000);
+constexpr uint8_t STALE_AFTER_FAILURES = 3;
 
 i2c_master_bus_handle_t bus = nullptr;
 i2c_master_dev_handle_t aht = nullptr;
 i2c_master_dev_handle_t bmp = nullptr;
+SensorMatterEndpoints matter_endpoints{};
 
 struct BmpCalibration {
     uint16_t t1, p1;
@@ -176,6 +180,52 @@ esp_err_t read_bmp(double *pressure_hpa)
     return ESP_OK;
 }
 
+// I2C executes in a FreeRTOS task, while Matter attributes must be changed on
+// the CHIP system layer. attribute::update() also marks the attribute dirty, so
+// existing controller subscriptions receive a normal Matter report.
+void schedule_aht_report(int16_t temperature_centi, uint16_t humidity_centi, bool valid)
+{
+    const CHIP_ERROR schedule_err = chip::DeviceLayer::SystemLayer().ScheduleLambda(
+        [temperature_centi, humidity_centi, valid]() {
+            esp_matter_attr_val_t temperature = valid
+                ? esp_matter_nullable_int16(nullable<int16_t>(temperature_centi))
+                : esp_matter_nullable_int16(nullable<int16_t>());
+            esp_matter_attr_val_t humidity = valid
+                ? esp_matter_nullable_uint16(nullable<uint16_t>(humidity_centi))
+                : esp_matter_nullable_uint16(nullable<uint16_t>());
+            esp_err_t err = esp_matter::attribute::update(
+                matter_endpoints.temperature, chip::app::Clusters::TemperatureMeasurement::Id,
+                chip::app::Clusters::TemperatureMeasurement::Attributes::MeasuredValue::Id, &temperature);
+            if (err != ESP_OK) ESP_LOGE(TAG, "Matter temperature update: %s", esp_err_to_name(err));
+            err = esp_matter::attribute::update(
+                matter_endpoints.humidity, chip::app::Clusters::RelativeHumidityMeasurement::Id,
+                chip::app::Clusters::RelativeHumidityMeasurement::Attributes::MeasuredValue::Id, &humidity);
+            if (err != ESP_OK) ESP_LOGE(TAG, "Matter humidity update: %s", esp_err_to_name(err));
+            ESP_LOGI(TAG, "Matter AHT20 report: %s", valid ? "updated" : "unknown (stale)");
+        });
+    if (schedule_err != CHIP_NO_ERROR) {
+        ESP_LOGE(TAG, "Could not schedule Matter AHT20 report: %" CHIP_ERROR_FORMAT, schedule_err.Format());
+    }
+}
+
+void schedule_pressure_report(int16_t pressure_hpa, bool valid)
+{
+    const CHIP_ERROR schedule_err = chip::DeviceLayer::SystemLayer().ScheduleLambda(
+        [pressure_hpa, valid]() {
+            esp_matter_attr_val_t pressure = valid
+                ? esp_matter_nullable_int16(nullable<int16_t>(pressure_hpa))
+                : esp_matter_nullable_int16(nullable<int16_t>());
+            const esp_err_t err = esp_matter::attribute::update(
+                matter_endpoints.pressure, chip::app::Clusters::PressureMeasurement::Id,
+                chip::app::Clusters::PressureMeasurement::Attributes::MeasuredValue::Id, &pressure);
+            if (err != ESP_OK) ESP_LOGE(TAG, "Matter pressure update: %s", esp_err_to_name(err));
+            ESP_LOGI(TAG, "Matter BMP280 report: %s", valid ? "updated" : "unknown (stale)");
+        });
+    if (schedule_err != CHIP_NO_ERROR) {
+        ESP_LOGE(TAG, "Could not schedule Matter BMP280 report: %" CHIP_ERROR_FORMAT, schedule_err.Format());
+    }
+}
+
 void sensor_task(void *)
 {
     i2c_master_bus_config_t cfg = {};
@@ -226,6 +276,13 @@ void sensor_task(void *)
     if (!have_aht && !have_bmp) {
         ESP_LOGE(TAG, "No readable sensors. Confirm VDD=3V3, GND, D4=SDA, D5=SCL.");
     }
+    if (!have_aht) schedule_aht_report(0, 0, false);
+    if (!have_bmp) schedule_pressure_report(0, false);
+
+    uint8_t aht_failures = 0;
+    uint8_t bmp_failures = 0;
+    bool aht_stale_reported = !have_aht;
+    bool bmp_stale_reported = !have_bmp;
 
     while (true) {
         if (have_aht) {
@@ -233,8 +290,17 @@ void sensor_task(void *)
             err = read_aht(&temp, &humidity);
             if (err == ESP_OK) {
                 ESP_LOGI(TAG, "AHT20: %.2f C / %.2f %%RH", temp, humidity);
+                schedule_aht_report(static_cast<int16_t>(std::lround(temp * 100.0f)),
+                                    static_cast<uint16_t>(std::lround(humidity * 100.0f)), true);
+                aht_failures = 0;
+                aht_stale_reported = false;
             } else {
                 ESP_LOGW(TAG, "AHT20 read failed: %s", esp_err_to_name(err));
+                if (aht_failures < STALE_AFTER_FAILURES) ++aht_failures;
+                if (aht_failures == STALE_AFTER_FAILURES && !aht_stale_reported) {
+                    schedule_aht_report(0, 0, false);
+                    aht_stale_reported = true;
+                }
             }
         }
         if (have_bmp) {
@@ -242,8 +308,16 @@ void sensor_task(void *)
             err = read_bmp(&pressure);
             if (err == ESP_OK) {
                 ESP_LOGI(TAG, "BMP280: %.2f hPa (absolute station pressure)", pressure);
+                schedule_pressure_report(static_cast<int16_t>(std::lround(pressure)), true);
+                bmp_failures = 0;
+                bmp_stale_reported = false;
             } else {
                 ESP_LOGW(TAG, "BMP280 read failed: %s", esp_err_to_name(err));
+                if (bmp_failures < STALE_AFTER_FAILURES) ++bmp_failures;
+                if (bmp_failures == STALE_AFTER_FAILURES && !bmp_stale_reported) {
+                    schedule_pressure_report(0, false);
+                    bmp_stale_reported = true;
+                }
             }
         }
         vTaskDelay(PERIOD);
@@ -251,9 +325,10 @@ void sensor_task(void *)
 }
 } // namespace
 
-void start_sensor_diagnostics()
+void start_sensor_diagnostics(const SensorMatterEndpoints &endpoints)
 {
-    // Do not block Matter/Thread startup. Diagnostics run at a lower-priority task.
+    matter_endpoints = endpoints;
+    // Do not block Matter/Thread startup. Sensor I/O runs at a lower priority.
     if (xTaskCreate(sensor_task, "sensor_diag", 4096, nullptr, 4, nullptr) != pdPASS) {
         ESP_LOGE(TAG, "Failed to create sensor diagnostics task");
     }

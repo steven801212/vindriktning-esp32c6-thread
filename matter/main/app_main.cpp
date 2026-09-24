@@ -55,8 +55,8 @@ static void app_event_cb(const ChipDeviceEvent *event, intptr_t arg)
 
 extern "C" void app_main(void)
 {
-    ESP_LOGI(TAG, "VINDRIKTNING Matter-over-Thread v0.2.0-dev2");
-    ESP_LOGI(TAG, "Fake sensor data: 25.00 C / 50.00 %%RH / PM2.5 10 ug/m3 / Air Quality Good");
+    ESP_LOGI(TAG, "VINDRIKTNING Matter-over-Thread v0.2.0-dev3");
+    ESP_LOGI(TAG, "AHT20 temperature/humidity and BMP280 pressure start as unknown until sampled; PM2.5=10 ug/m3 / Air Quality Good remain development values");
 
     esp_err_t err = nvs_flash_init();
     if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
@@ -87,21 +87,33 @@ extern "C" void app_main(void)
     ABORT_APP_ON_FAILURE(pm25_cluster != nullptr, ESP_LOGE(TAG, "Failed to add PM2.5 cluster"));
 
     temperature_sensor::config_t temp_config;
-    temp_config.temperature_measurement.measured_value = nullable<int16_t>(2500);
+    // Do not advertise a plausible-but-false value before the first CRC-checked
+    // AHT20 sample arrives.
+    temp_config.temperature_measurement.measured_value = nullable<int16_t>();
     temp_config.temperature_measurement.min_measured_value = nullable<int16_t>(-4000);
     temp_config.temperature_measurement.max_measured_value = nullable<int16_t>(12500);
     endpoint_t *temp_ep = temperature_sensor::create(node, &temp_config, ENDPOINT_FLAG_NONE, nullptr);
     ABORT_APP_ON_FAILURE(temp_ep != nullptr, ESP_LOGE(TAG, "Failed to create Temperature endpoint"));
 
     humidity_sensor::config_t humidity_config;
-    humidity_config.relative_humidity_measurement.measured_value = nullable<uint16_t>(5000);
+    humidity_config.relative_humidity_measurement.measured_value = nullable<uint16_t>();
     humidity_config.relative_humidity_measurement.min_measured_value = nullable<uint16_t>(0);
     humidity_config.relative_humidity_measurement.max_measured_value = nullable<uint16_t>(10000);
     endpoint_t *humidity_ep = humidity_sensor::create(node, &humidity_config, ENDPOINT_FLAG_NONE, nullptr);
     ABORT_APP_ON_FAILURE(humidity_ep != nullptr, ESP_LOGE(TAG, "Failed to create Humidity endpoint"));
 
-    ESP_LOGI(TAG, "Endpoints: air-quality=%u temperature=%u humidity=%u",
-             endpoint::get_id(aq_ep), endpoint::get_id(temp_ep), endpoint::get_id(humidity_ep));
+    // Matter Pressure Measurement is expressed as whole hPa. BMP280 supplies
+    // absolute station pressure; no sea-level correction is implied.
+    pressure_sensor::config_t pressure_config;
+    pressure_config.pressure_measurement.pressure_measured_value = nullable<int16_t>();
+    pressure_config.pressure_measurement.pressure_min_measured_value = nullable<int16_t>(300);
+    pressure_config.pressure_measurement.pressure_max_measured_value = nullable<int16_t>(1100);
+    endpoint_t *pressure_ep = pressure_sensor::create(node, &pressure_config, ENDPOINT_FLAG_NONE, nullptr);
+    ABORT_APP_ON_FAILURE(pressure_ep != nullptr, ESP_LOGE(TAG, "Failed to create Pressure endpoint"));
+
+    ESP_LOGI(TAG, "Endpoints: air-quality=%u temperature=%u humidity=%u pressure=%u",
+             endpoint::get_id(aq_ep), endpoint::get_id(temp_ep), endpoint::get_id(humidity_ep),
+             endpoint::get_id(pressure_ep));
 
 #if CHIP_DEVICE_CONFIG_ENABLE_THREAD
     esp_openthread_platform_config_t ot_config = {
@@ -117,5 +129,10 @@ extern "C" void app_main(void)
 
     ESP_LOGI(TAG, "Matter started. Device is ready for BLE commissioning into a Thread network.");
     ESP_LOGI(TAG, "Development setup passcode is normally 20202021 / discriminator 3840 unless factory data overrides it.");
-    start_sensor_diagnostics();
+    const SensorMatterEndpoints sensor_endpoints = {
+        endpoint::get_id(temp_ep),
+        endpoint::get_id(humidity_ep),
+        endpoint::get_id(pressure_ep),
+    };
+    start_sensor_diagnostics(sensor_endpoints);
 }
