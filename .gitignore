@@ -2,6 +2,7 @@
 .vscode/
 /matter/build/
 /matter/build-dev3/
+/matter/build-vendor/
 sdkconfig
 sdkconfig.*
 !sdkconfig.defaults
