@@ -9,7 +9,7 @@
 - Temperature and humidity begin as **unknown** until the first CRC-checked AHT20 reading; after three consecutive failed reads (15 seconds) they are reported as unknown again rather than left stale. A later valid reading recovers them.
 - A new standard Matter Pressure Sensor endpoint is created after the existing air-quality, temperature, and humidity endpoints. BMP280 pressure is rounded to whole hPa and is **absolute station pressure**, not sea-level corrected. It follows the same three-failure stale policy.
 - PM2.5 remains the development 10 µg/m³ value and Air Quality remains Good until the PM1006 receive-only wiring is installed. The existing endpoint IDs 1/2/3 do not move.
-- The Matter Basic Information display names are configured as `Steven DIY` / `VINDRIKTNING Thread Sensor`. Development VID `0xFFF1` and PID `0x8000` remain unchanged; these names do **not** imply certification or an assigned vendor identity. Recheck HA after flashing the name update; existing device metadata may be cached.
+- The Matter Basic Information display names are `Steven DIY` / `VINDRIKTNING Thread Sensor`, as verified on the HA device page after flashing. Development VID `0xFFF1` and PID `0x8000` remain unchanged; these names do **not** imply certification or an assigned vendor identity.
 
 ## Sensor wiring (XIAO ESP32-C6)
 

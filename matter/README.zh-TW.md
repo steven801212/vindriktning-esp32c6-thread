@@ -9,7 +9,7 @@
 - 溫濕度在第一次通過 CRC 的 AHT20 讀值前是**未知值**；連續三次讀取失敗（目前週期為 5 秒，即 15 秒）後也會重新報告未知，避免控制器持續顯示舊數值。讀取恢復後會重新更新。
 - 新增一個排在既有空品、溫度與濕度端點之後的標準 Matter Pressure Sensor 端點。BMP280 以整數 hPa 回報**所在地絕對氣壓**，不做海平面校正，且同樣採三次失敗後標示未知的策略。
 - PM2.5 仍維持開發用 10 µg/m³、Air Quality 仍為 Good，直到接上 PM1006 的被動 RX。既有端點 1/2/3 不會換號。
-- Matter Basic Information 的顯示名稱設定為 `Steven DIY`／`VINDRIKTNING Thread Sensor`，仍使用開發用 VID `0xFFF1`／PID `0x8000`，**不是**取得認證的廠商身分。名稱更新需刷入新韌體後再核對 HA 顯示，既有 HA 裝置資訊也可能有快取。
+- Matter Basic Information 的顯示名稱設定為 `Steven DIY`／`VINDRIKTNING Thread Sensor`，並已在 HA 裝置頁實測顯示；開發用 VID `0xFFF1`／PID `0x8000` 維持不變，**不是**取得認證的廠商身分。
 
 ## 接線：XIAO ESP32-C6
 
