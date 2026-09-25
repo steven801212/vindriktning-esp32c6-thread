@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.2.0-dev3
+
+- Publish CRC-checked AHT20 temperature and relative humidity to the existing Matter endpoints 2 and 3 using `attribute::update()` on the CHIP system layer. This produces normal reports for active Matter subscriptions.
+- Start temperature/humidity as nullable rather than presenting the old 25 °C / 50 %RH demo readings before the first valid sample.
+- Mark AHT20 values unknown after three consecutive failed reads (15 seconds at the current cadence), and publish a recovery sample when reads resume.
+- Add a standard Matter Pressure Sensor endpoint after the existing endpoints. BMP280 absolute station pressure is rounded to whole hPa; it also becomes unknown after three consecutive read failures.
+- Preserve the development PM2.5 10 µg/m3 and Air Quality Good values until the PM1006 receive-only wiring is added. The partition table and NVS handling are unchanged.
+
+## 0.2.0-dev1
+
+- Add first Matter-over-Thread development scaffold on `phase2-matter-thread`.
+- Target ESP-Matter `release/v1.4.2` with ESP-IDF `v5.4.1` and ESP32-C6.
+- Add BLE Matter commissioning path for joining an existing Thread mesh without manually committing household Thread credentials.
+- Add fixed development values for Air Quality, PM2.5, temperature, and humidity.
+- Document VINDRIKTNING PM1006 UART behavior: 9600 baud, 20-byte frames, `16 11 0B` header, PM2.5 in bytes 5/6, and 8-bit checksum sum equal to zero.
+- Define the PM1006 integration as passive RX-only monitoring using ESP32-C6 hardware UART and a non-blocking parser.
+- Add electrical safety requirement for the reported ~5 V VINDRIKTNING UART signal; initial RX design uses a 10 kΩ / 15 kΩ divider to approximately 3.0 V.
+- Keep stock IKEA fan/LED/polling behavior unchanged for the first hardware version.
+
 ## 0.1.7-phase1-heartbeat
 
 - Validated on real XIAO ESP32-C6 hardware: `detached -> leader` at ~35 s.
