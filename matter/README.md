@@ -4,12 +4,12 @@
 
 ## Status
 
-- `dev1` was flashed to the XIAO ESP32-C6. Apple Home successfully commissioned the device; a later serial log showed two stored Matter fabrics. This is not a validation of the new sensor wiring.
+- `dev3` was flashed to the XIAO ESP32-C6. The existing Apple Home pairing was preserved, and Home Assistant was added via Matter Multi-Admin. The HA device page showed live temperature, humidity, and pressure; longer-term stability remains to be observed.
 - `dev3` turns the verified AHT20 acquisition into Matter reports: its real temperature and humidity update the existing endpoints 2 and 3. The report is scheduled on the CHIP system layer, so a controller with an active subscription receives standard Matter attribute reports.
 - Temperature and humidity begin as **unknown** until the first CRC-checked AHT20 reading; after three consecutive failed reads (15 seconds) they are reported as unknown again rather than left stale. A later valid reading recovers them.
 - A new standard Matter Pressure Sensor endpoint is created after the existing air-quality, temperature, and humidity endpoints. BMP280 pressure is rounded to whole hPa and is **absolute station pressure**, not sea-level corrected. It follows the same three-failure stale policy.
 - PM2.5 remains the development 10 µg/m³ value and Air Quality remains Good until the PM1006 receive-only wiring is installed. The existing endpoint IDs 1/2/3 do not move.
-- Build and field validation remain required; this repository does not claim that Apple Home, Home Assistant, Thread, or a physical device has been operated by this change.
+- The Matter Basic Information display names are configured as `Steven DIY` / `VINDRIKTNING Thread Sensor`. Development VID `0xFFF1` and PID `0x8000` remain unchanged; these names do **not** imply certification or an assigned vendor identity. Recheck HA after flashing the name update; existing device metadata may be cached.
 
 ## Sensor wiring (XIAO ESP32-C6)
 
@@ -41,13 +41,13 @@ git pull --ff-only
 source ~/esp/esp-idf/export.sh
 source ~/esp/esp-matter/export.sh
 cd matter
-idf.py -B build-dev3 -D SDKCONFIG=sdkconfig.dev3 build
-grep '^CONFIG_ESP_MATTER_MAX_DYNAMIC_ENDPOINT_COUNT=' sdkconfig.dev3
+idf.py -B build-vendor -D SDKCONFIG=sdkconfig.vendor build
+grep -E '^(CONFIG_CHIP_PROJECT_CONFIG|CONFIG_ESP_MATTER_MAX_DYNAMIC_ENDPOINT_COUNT)=' sdkconfig.vendor
 # Expect 5. Confirm the serial boot log says the current app is from OTA 0.
-idf.py -B build-dev3 -D SDKCONFIG=sdkconfig.dev3 -p /dev/ttyACM0 app-flash monitor
+idf.py -B build-vendor -D SDKCONFIG=sdkconfig.vendor -p /dev/ttyACM0 app-flash monitor
 ```
 
-If `git status --short` reports local edits, preserve them and resolve before pulling. Exit a running serial monitor with `Ctrl+]` before flashing. The separate `sdkconfig.dev3` matters: an existing dev2 `sdkconfig` can retain the old endpoint limit of 4, even though `sdkconfig.defaults` now says 5. **Check that the current device boots from OTA 0 before using the app-only command above.** The prior dev2 log showed OTA 0, but check again in the current serial boot log. `app-flash` writes only the application at `0x20000`; it leaves bootloader, partition table, OTA selection, and NVS untouched. Do not use `erase-flash` or `set-target`. If the device currently boots from OTA 1, stop and choose the correct update path rather than blindly flashing OTA 0. Verify Apple Home and HA after reboot.
+If `git status --short` reports local edits, preserve them and resolve before pulling. Exit a running serial monitor with `Ctrl+]` before flashing. Use a fresh `sdkconfig.vendor`: an existing `sdkconfig.dev3` can retain an empty `CONFIG_CHIP_PROJECT_CONFIG` and therefore ignore the newly added names in the defaults. Check that the new config references `main/CHIPProjectConfig.h`, keeps the endpoint limit at 5, and still uses VID/PID `0xFFF1` / `0x8000`. **Check that the current device boots from OTA 0 before using the app-only command above.** `app-flash` writes only the application at `0x20000`; it leaves bootloader, partition table, OTA selection, and NVS untouched. Do not use `erase-flash` or `set-target`. If the device currently boots from OTA 1, stop and choose the correct update path rather than blindly flashing OTA 0. Verify Apple Home and HA after reboot.
 
 Expected diagnostic format, **illustrative rather than measured**:
 
@@ -61,7 +61,7 @@ I (...) SENSOR_DIAG: Matter AHT20 report: updated
 I (...) SENSOR_DIAG: Matter BMP280 report: updated
 ```
 
-If scanning finds neither device, check VDD/GND, the connector pin order, SDA/SCL, and I²C pull-ups. Upload the first `SENSOR_DIAG` lines, including any error, before integrating actual readings into Matter.
+If scanning finds neither device, check VDD/GND, the connector pin order, SDA/SCL, and I²C pull-ups. Upload the first `SENSOR_DIAG` lines, including any error.
 
 ## Toolchain
 
@@ -74,10 +74,12 @@ The two stored Fabric entries in the serial log only prove that two fabrics were
 1. Keep the iPhone and HomePod mini updated, on the same Apple Home, and ensure the iPhone is signed in as the **home owner**. Apple Home supports Matter temperature and humidity sensors, but Apple does not list pressure among the Matter sensor types it exposes in Home. Treat pressure display in Apple Home as unsupported/unverified even though the firmware exposes the standard cluster.
 2. In Apple Home, open this accessory's settings and use its Matter sharing / `Turn On Pairing Mode` action to generate the temporary setup code. This action asks the already-paired fabric to open an enhanced commissioning window; it is not the BLE advertisement shown at a fresh factory commission. If the action is absent, update iOS/HomePod software and verify owner status before changing firmware.
 3. In the **Home Assistant Companion app** (not the browser), use **Settings → Connectivity → Matter → Add device**, choose **Yes, it’s already in use**, choose Apple Home, then follow the handoff prompts for the temporary code. Keep the app open while it hands the code to the Matter integration.
-4. HAOS on Proxmox needs a bridged NIC on the HomePod's IoT VLAN (not ordinary NAT); the iPhone can be on another routed LAN if local discovery and controller handoff work. Allow IPv6 ICMP/ND, multicast DNS UDP 5353, and Matter UDP 5540. Confirm not only an IPv6 address but a usable **route to the Thread device address discovered by Matter Server** (for example `ip -6 route get <device-IPv6>` in an HAOS shell). A default IPv6 route on another NIC does not prove the Thread prefix is reachable; do not invent a gateway or disable isolation before identifying the actual missing route.
+4. HAOS need not share the HomePod's IoT VLAN, but routed VLANs require an IPv6 route to the Thread prefix and working Matter discovery; ordinary NAT can break end-to-end connectivity. Allow the required IPv6 ICMP/ND, mDNS UDP 5353, and Matter UDP 5540 through bridges, firewalls, and routers. In HAOS, test `ip -6 route get <device-IPv6>` and `ping -6 <device-IPv6>`. Both succeeded in this installation, while initial commissioning still failed certificate verification.
 5. During one pairing attempt collect, without sharing Thread credentials: `ha addons logs core_matter_server`, `ha core logs`, and the ESP serial log from `Matter commissioning session started` through completion/failure. A successful session needs a commissioning-window event and successful CASE traffic. `SRP update timed out`, repeated CASE Sigma1 retransmissions, and `unknown session` warrant route/discovery investigation but do not by themselves identify the failed link or prove an AHT20 problem.
 
-Home Assistant may expose the standard pressure endpoint if its Matter Server/device mapping supports it. That is a HA field test, not a promise; use the HA entity/device page after commissioning as the evidence. Apple Home pressure display is explicitly not claimed.
+The HA device page in this installation exposed the standard pressure endpoint in kPa (for example, 101.30 kPa = 1013 hPa). Apple Home pressure display is still not claimed.
+
+This self-built firmware uses a Matter test attestation certificate. HA Matter Server accepted it only after **Test DCL** was enabled; a new Multi-Admin sharing attempt then succeeded. Test DCL is a server-wide trust setting, not device-specific, and is not a production security configuration.
 
 ## Security
 
