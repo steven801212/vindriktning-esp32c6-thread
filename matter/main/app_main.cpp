@@ -1,6 +1,7 @@
 #include <esp_err.h>
 #include <esp_log.h>
 #include <esp_matter.h>
+#include <driver/gpio.h>
 #include <nvs_flash.h>
 #include "sensor_diag.h"
 
@@ -57,6 +58,14 @@ extern "C" void app_main(void)
 {
     ESP_LOGI(TAG, "VINDRIKTNING Matter-over-Thread v0.2.0-dev3");
     ESP_LOGI(TAG, "AHT20 temperature/humidity and BMP280 pressure start as unknown until sampled; PM2.5=10 ug/m3 / Air Quality Good remain development values");
+
+    // XIAO ESP32-C6: GPIO3 enables the RF switch and GPIO14 selects its
+    // built-in ceramic antenna. Set both before starting the Thread radio.
+    ESP_ERROR_CHECK(gpio_set_level(GPIO_NUM_3, 0));
+    ESP_ERROR_CHECK(gpio_set_direction(GPIO_NUM_3, GPIO_MODE_OUTPUT));
+    ESP_ERROR_CHECK(gpio_set_level(GPIO_NUM_14, 0));
+    ESP_ERROR_CHECK(gpio_set_direction(GPIO_NUM_14, GPIO_MODE_OUTPUT));
+    ESP_LOGI(TAG, "XIAO ESP32-C6 RF switch: built-in antenna (GPIO3=0, GPIO14=0)");
 
     esp_err_t err = nvs_flash_init();
     if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
